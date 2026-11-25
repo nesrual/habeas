@@ -1,0 +1,8 @@
+# The severity rubric (plan S7). A starting version: the owner decides the final wording.
+# The writer proposes a level and the proof checker rates independently; a mismatch is flagged.
+version: 1
+levels:
+  critical: Money can move or be lost, or authentication or authorisation can be bypassed for any account.
+  high: One customer can see or change another customer's data, or financial records can be corrupted.
+  medium: Records can be left in an invalid state, or the service can be stopped, under conditions an ordinary user can cause.
+  low: The defect is real and proven, with limited effect and no loss of money or data.

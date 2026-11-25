@@ -1,0 +1,101 @@
+# Copy to config/run.yaml (git-ignored) and fill in the TODO values.
+# Target, units, lenses, rules and budget (plan 6.2). TODO values are the owner's to fill in.
+target:
+  repo_path: TODO                   # the audit clone: a second clone of the repository, used only by the audit
+  commit: HEAD                      # the audited commit is recorded in the ledger
+  engines: []                       # packages to audit, by name. Empty means all.
+  language: ruby
+  framework: rails
+  # Commands that run specs in the audit clone; {paths} is replaced by the spec paths and
+  # {engine} by the package name. See config/runners/example-rspec.sh for a Docker runner.
+  engine_test_command: TODO
+  root_test_command: TODO
+  related_specs: same_engine        # narrowed per proof, see section 11
+  proof_environment:
+    kind: local_checkout            # the developer's own machine and test setup, in the audit clone
+    run_tests_in: host              # host | dev_container
+    # Plan 11.1: the test setup must block unrecorded outbound HTTP. Give a command that exits 0
+    # only when it does (for example a spec that expects WebMock to raise), or state how it was verified.
+    network_check_command: null
+    outbound_http_blocked: TODO
+    env_allowlist: []               # extra environment variables the tests may see; never credentials
+
+units:
+  max_tokens: 6000
+  pack_small_files: true            # many small files are packed into one unit
+  pack_target_tokens: 4000
+  context_tokens: 2000              # read-only context added to a unit, see S0 step 8
+  include:
+    - "engines/*/app/**/*.rb"
+    - "engines/*/lib/**/*.rb"
+    - "engines/*/config/routes*.rb"
+    - "engines/*/config/routes/**/*.rb"
+    - "gems/*/lib/**/*.rb"
+    - "app/**/*.rb"
+    - "lib/**/*.rb"
+    - "config/initializers/**/*.rb"
+  exclude: ["spec/**", "engines/*/spec/**", "gems/*/spec/**", "db/**", "vendor/**", "node_modules/**", "tmp/**"]
+  package_from_path: "engines/{package}/|gems/{package}/"
+  sensitive_globs: ["**/*"]         # default: everything is sensitive
+  flow_units:
+    enabled: false                  # later
+    max_tokens: 12000
+    max_hops: 2
+
+scanners: [brakeman, semgrep, bundler-audit]   # brakeman is already in the bundle; import Snyk findings from CI if available
+
+lenses: [authz_tenancy, money_ledger, input_to_sink, concurrency, secrets_crypto, error_handling]
+runs_per_finder: 6                  # run i uses lens i and effort_schedule[i]
+prompt_variant: invariant
+
+merge:
+  adjacent_lines: 2
+  # The plan pre-groups within one lens. The trial run of 2026-11-22 raised one defect under
+  # four lenses and kept four clusters, so candidates are now compared across lenses too.
+  across_lenses: true
+  # pairs: one call per pair (the plan's form). partition: one call per seat sorts a whole
+  # group of nearby candidates; two join only when both seats group them together. Pairs grow
+  # with the square of a group (2,470 candidates gave 43,792), so partition is the default here.
+  mode: partition
+  partition_max: 30                 # larger groups are sorted in windows of this many, by place in the code
+
+critics:
+  drop_rule: unanimous              # the only allowed value
+
+provers:
+  rule: any_valid
+  max_attempts_per_prover: 2
+  timeout_minutes: 10
+  max_fix_lines: 40
+  max_fix_files: 3
+  repeat: 1                         # red and green each run this many times
+  concurrency_repeat: 10            # for the concurrency lens
+  concurrency_min_red: 3
+  browse:                           # what a scripted prover may look at in the audit clone, read-only
+    max_steps: 12                   # model calls per attempt: read, list, search, then submit or decline
+    max_chars: 120000               # stop handing out more file content after this much
+    allow: ["**/*.rb", "**/*.rake", "**/*.yml", "**/*.yaml", "**/*.md", "**/Gemfile", "bin/*"]
+    deny: []                        # added to the built-in list (fixtures, cassettes, keys, certificates, .env, credentials, seeds)
+
+quarantine:
+  lenses: [authz_tenancy, input_to_sink, secrets_crypto]   # owner may add more
+
+baseline:                           # known findings, see S0 step 9
+  brakeman_ignore: config/brakeman.ignore
+  scanner_reports: []               # paths to Brakeman and Snyk output
+  known_issues: []                  # owner-supplied list
+
+cache:
+  cross_run: false                  # later, see section 12.4
+
+canaries:                           # later
+  rate: 0.05                        # share of each batch
+  alarm_drop_pct: 30                # relative drop in canary recall that triggers a re-run
+
+stop_rule:
+  min_gain_pct: 2                   # for seat selection in the bake-off
+
+budget:                             # soft limits: the run pauses and asks, it never stops for good
+  limit_usd: 100                    # starting limit; the owner sets it
+  limit_tokens: null                # optional second limit on total tokens, input plus output
+  warn_at_pct: 80

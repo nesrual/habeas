@@ -1,0 +1,130 @@
+# Endpoints and seats (plan 6.1). Model IDs were listed on OpenRouter on 2026-11-22.
+# Seat `stop_on_whitespace_run: true` sends stop sequences that end Mistral's whitespace runaway.
+# Engine additions: seat `canonical_model` (the dated slug the endpoint reports),
+# seat `json_schema: false`, seat `extra_body`, endpoint `openrouter: true|false`.
+version: 1
+
+endpoints:
+  openrouter:
+    adapter: openai_compat
+    base_url: https://openrouter.ai/api/v1
+    key_env: OPENROUTER_API_KEY
+    max_concurrency: 32
+  local:
+    adapter: openai_compat
+    base_url: http://localhost:1234/v1
+    key_env: null
+    max_concurrency: 1
+
+# Applied to every OpenRouter call unless a seat overrides it.
+provider_defaults:
+  allow_fallbacks: false
+  require_parameters: true
+  data_collection: deny
+  # zdr: true            # switch on per seat where a zero-retention host exists
+
+# When a seat's model refuses a call (HTTP 403 refusal, content filter, or a refusal in
+# place of the answer), the same call is sent once to another model: the seat's
+# `alternate_model` if it has one, else the model below. The refused call stays in the
+# ledger. `refusal_fallback: false` on a seat switches this off for that seat.
+refusal_fallback:
+  enabled: true
+  model: anthropic/claude-opus-5.5
+
+seats:
+  scout:
+    - id: scout-deepseek
+      enabled: false                 # later; the first version orders by scanner hits
+      lab: deepseek
+      endpoint: openrouter
+      model: deepseek/deepseek-v4.1-flash-1017
+      open_weights: true
+      provider: { only: [TODO_APPROVED_HOST] }   # not the maker's own endpoint
+      effort: low
+
+  finder:
+    - id: finder-anthropic
+      lab: anthropic
+      endpoint: openrouter
+      model: anthropic/claude-fable-5.2
+      alternate_model: anthropic/claude-opus-5.5
+      effort_schedule: [high, high, low, high, medium, high]
+    - id: finder-google
+      lab: google
+      endpoint: openrouter
+      model: google/gemini-4-neon
+      alternate_model: google/gemini-4-carbon
+      effort_schedule: [high, high, low, high, medium, high]
+    # Added 2026-11-23 as a side-by-side test: Neon raised few candidates on the first full run.
+    # Same lab as finder-google, so the count of raising labs does not change.
+    - id: finder-google-carbon
+      lab: google
+      endpoint: openrouter
+      model: google/gemini-4-carbon
+      effort_schedule: [high, high, low, high, medium, high]
+    - id: finder-openai
+      lab: openai
+      endpoint: openrouter
+      model: openai/gpt-6.2-sol
+      alternate_model: openai/gpt-6.2-astra
+      effort_schedule: [high, high, low, high, medium, high]
+    - id: finder-moonshot
+      enabled: false                 # owner, 2026-11-22: off until a host is approved (provider.only)
+      lab: moonshot
+      endpoint: openrouter
+      model: moonshotai/kimi-k3.1-pro
+      open_weights: true
+      provider: { only: [TODO_APPROVED_HOST] }   # the alternate is a second approved host
+      # OpenRouter lists max, high, low and none for this model (2026-11-22): no medium.
+      # The fifth run uses max, the highest level it accepts.
+      effort_schedule: [high, high, low, high, max, high]
+    - id: finder-deepseek
+      enabled: false                 # owner, 2026-11-22: off until a host is approved (provider.only)
+      lab: deepseek
+      endpoint: openrouter
+      model: deepseek/deepseek-v4.1-flash-1017
+      open_weights: true
+      provider: { only: [TODO_APPROVED_HOST] }   # the alternate is a second approved host
+      effort_schedule: [high, high, high, high, high, high]   # highest level the host accepts
+
+  # Run only in bake-off mode until promoted by the stop rule (section 13).
+  trial_finder:
+    - { id: trial-openai-astra,  lab: openai,    endpoint: openrouter, model: openai/gpt-6.2-astra }
+    - { id: trial-anthropic-son, lab: anthropic, endpoint: openrouter, model: anthropic/claude-sonnet-5.5, effort: low }
+    - { id: trial-google-carbon, lab: google,    endpoint: openrouter, model: google/gemini-4-carbon }
+    - { id: trial-xai,           lab: xai,       endpoint: openrouter, model: x-ai/grok-4.7 }
+    - { id: trial-meta,          lab: meta,      endpoint: openrouter, model: meta/muse-wonder }
+    - { id: trial-xiaomi,        lab: xiaomi,    endpoint: openrouter, model: xiaomi/mimo-v2.6-pro }
+    - { id: trial-zai,           lab: zai,       endpoint: openrouter, model: z-ai/glm-5.3-flash }
+    - { id: trial-alibaba,       lab: alibaba,   endpoint: openrouter, model: qwen/qwen4-max, non_sensitive_only: true }
+    - { id: trial-tencent,       lab: tencent,   endpoint: openrouter, model: tencent/hy4,    non_sensitive_only: true }
+
+  merger:
+    - { id: merger,        lab: anthropic, endpoint: openrouter, model: anthropic/claude-sonnet-5.5 }
+  merge_auditor:
+    - { id: merge-auditor, lab: openai,    endpoint: openrouter, model: openai/gpt-6.2-sol }
+
+  critic:
+    - { id: critic-openai,    lab: openai,    endpoint: openrouter, model: openai/gpt-6.2-astra,       alternate_model: openai/gpt-6.2-sol,         effort: high }
+    - { id: critic-anthropic, lab: anthropic, endpoint: openrouter, model: anthropic/claude-opus-5.5,  alternate_model: anthropic/claude-fable-5.2, effort: high }
+    - { id: critic-google,    lab: google,    endpoint: openrouter, model: google/gemini-4-carbon,     alternate_model: google/gemini-4-neon,       effort: high }
+
+  prover:
+    - { id: prover-native,  lab: harness,  endpoint: native }
+    # prover-kimi is off until a host is approved; prover-mistral is the second prover lab meanwhile (owner, 2026-11-22)
+    - { id: prover-kimi,    lab: moonshot, endpoint: openrouter, mode: scripted, model: moonshotai/kimi-k3.1-pro, open_weights: true, provider: { only: [TODO_APPROVED_HOST] }, enabled: false }
+    - { id: prover-mistral, lab: mistral,  endpoint: openrouter, mode: scripted, model: mistralai/mistral-large-4-0, stop_on_whitespace_run: true }
+    # Scripted provers browse the audit clone read-only (see provers.browse in run.yaml).
+    # Added 2026-11-22 after Mistral alone proved nothing; its proofs are checked by the google checker.
+    - { id: prover-openai,  lab: openai,   endpoint: openrouter, mode: scripted, model: openai/gpt-6.2-sol, effort: high }
+    # Added 2026-11-23: GPT-6.2 Sol declines to write failing tests for authorisation gaps
+    # ("a runnable reproduction of a cross-account bypass"). This seat takes those clusters.
+    - { id: prover-anthropic, lab: anthropic, endpoint: openrouter, mode: scripted, model: anthropic/claude-opus-5.5, alternate_model: anthropic/claude-fable-5.2, effort: high }
+
+  proof_checker:
+    # a refused proof check goes to the other checker seat instead (it must stay outside the prover's lab)
+    - { id: proof-checker,     lab: google, endpoint: openrouter, model: google/gemini-4-carbon, effort: high, refusal_fallback: false }
+    - { id: proof-checker-alt, lab: openai, endpoint: openrouter, model: openai/gpt-6.2-sol,     effort: high, refusal_fallback: false }
+
+  writer:
+    - { id: writer, lab: anthropic, endpoint: openrouter, model: anthropic/claude-haiku-5.5 }

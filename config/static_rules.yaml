@@ -1,0 +1,35 @@
+# Model-free rules for the static rule seat (plan S1b). Each rule names a
+# built-in check and the lens its candidates belong to. Hits become ordinary
+# candidates and go through merge, critics and provers like any other, except
+# rules with `output: tech_debt`, which are listed in tech_debt.md only.
+version: 1
+rules:
+  - id: controller_action_without_authorisation
+    check: controller_authorisation
+    lens: authz_tenancy
+    class: security
+    engines: []                 # customer-facing engines; empty means all
+    paths: ["**/app/controllers/**/*.rb"]
+    authorise_calls: [authorize, policy_scope, verify_authorized, verify_policy_scoped]
+    skip_class_pattern: "(Application|Base)Controller$"
+    invariant: Every customer-facing controller action authorises through a Pundit policy.
+
+  - id: direct_status_write
+    check: state_machine_bypass
+    lens: money_ledger
+    class: correctness
+    markers: ["include AASM", "aasm "]
+    columns: [status, state, aasm_state]
+    invariant: Status changes go through state machine events, never a direct update.
+
+  - id: v1_table_write
+    check: write_to_base_class
+    lens: money_ledger
+    class: correctness
+    base_class: V1ApplicationRecord
+    invariant: Nothing writes to a V1 table.
+
+  - id: cross_engine_model_reference
+    check: cross_engine_model
+    output: tech_debt
+    model_paths: "engines/{package}/app/models/**/*.rb"

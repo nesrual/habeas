@@ -1,0 +1,15 @@
+# build outputs of fixtures/build_fixture.sh (built repos live outside or in tmp/)
+/tmp/
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+config.local.yaml
+
+# deep-audit engine runs: source excerpts and proofs of defects
+/runs/
+
+# the owner's own target settings and test runners (paths, image and database names)
+/config/run.yaml
+/config/runners/*
+!/config/runners/example-rspec.sh

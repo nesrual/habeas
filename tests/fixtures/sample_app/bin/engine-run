@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# bin/engine-run <engine> <command> [paths...]: run a command inside one engine.
+engine="$1"; shift
+cmd="$1"; shift
+cd "$(dirname "$0")/../engines/$engine" || exit 2
+paths=()
+for p in "$@"; do paths+=("${p#engines/$engine/}"); done
+exec "$cmd" "${paths[@]}"

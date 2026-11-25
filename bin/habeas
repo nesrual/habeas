@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# habeas deep-audit engine CLI. Self-locating; stdlib Python only.
+root="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m engine.cli "$@"

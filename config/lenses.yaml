@@ -1,0 +1,49 @@
+# Invariant wording per lens (plan 6.3). Goes into finder and prover prompts unchanged.
+authz_tenancy:
+  class: security
+  invariants:
+    - Every record lookup is scoped to the calling account.
+    - Every state-changing action checks that the caller may perform it on that record.
+    - Every customer-facing controller action authorises through a Pundit policy.
+    - The scope or permission an action requires matches what the action does (reading does not need a write scope, writing is not allowed with a read scope).
+  proof_shape: A test where account B requests or changes a record of account A and must be denied.
+
+money_ledger:
+  class: correctness
+  invariants:
+    - Every ledger write is idempotent under retry.
+    - Every transfer posts balanced entries, and amounts keep their currency and precision.
+    - Status changes go through state machine events, never a direct update.
+    - Nothing writes to a V1 table.
+  proof_shape: A test that replays the request and asserts a single posting and unchanged balances.
+
+input_to_sink:
+  class: security
+  invariants:
+    - Every user-supplied value is validated before it reaches a query, a shell call or a template.
+  proof_shape: A test that sends a value outside the allowed form and expects rejection.
+
+concurrency:
+  class: correctness
+  invariants:
+    - Two concurrent requests on one resource leave it in a valid state.
+    - A side effect outside the database that depends on a transaction is neither lost nor sent twice.
+  proof_shape: A test that runs both and checks the final state.
+
+secrets_crypto:
+  class: security
+  invariants:
+    - Keys and tokens never appear in logs or responses.
+    - Secrets are compared in constant time and never stored in plain text.
+  proof_shape: A test that performs the action and asserts the log and response contents.
+
+# Added 2026-11-23: a run missed three known defects (a 500 on an upstream error
+# of another shape, an error rewrite that altered echoed customer text, a mismatched scope).
+# None of the five lenses above asks about behaviour on failure paths.
+error_handling:
+  class: correctness
+  invariants:
+    - A failure of a dependency (another engine, an internal API, a repository) reaches the caller as the documented error response, never as an unhandled exception or a 500.
+    - Code that reads an error or result object works for every shape that object can have (nil, string, array, hash).
+    - Error handling does not change, drop or leak data that belongs to the request (values echoed back are unchanged).
+  proof_shape: A test that makes the dependency return a failure of a plausible shape and asserts the response status and body.
